@@ -17,8 +17,7 @@ class API {
     required String password,
     required String email,
   }) async {
-    try {
-      //DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    //DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
       //AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
       //final uuid = DeviceUuid().getUUID();
       HttpHandlerIm.attempt++;
@@ -30,13 +29,10 @@ class API {
 
       final resp = await dio.post(HttpHandlerIm.host + HttpHandlerIm.emailRec,
           data: data,);
-      print(1);
+      
       final serverSid = resp.data['sid'].toString();
-      return serverSid;
-    } catch (e) {
       HttpHandlerIm.attempt += 1;
-      throw e;
-    }
+      return serverSid;
   }
 }
 
@@ -51,6 +47,11 @@ class RegEmailAuthWidget extends StatefulWidget {
 }
 
 class _RegEmailAuthState extends State<RegEmailAuthWidget> {
+  @override
+  void initState() {
+    super.initState();
+    // 进一步的初始化代码
+  }
   final uuid = DeviceUuid().getUUID();
   Future<void> _finishValid() async {
     final dataAuth = {

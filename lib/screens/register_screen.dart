@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:login_register_app/api.dart';
 import 'package:login_register_app/utils/helpers/snackbar_helper.dart';
@@ -23,7 +24,8 @@ class _RegisterPageState extends State<RegisterPage> {
   late final TextEditingController emailController;
   late final TextEditingController passwordController;
   late final TextEditingController confirmPasswordController;
-
+  String dataSend = 'no';
+  bool isClicked = false;
   final ValueNotifier<bool> passwordNotifier = ValueNotifier(true);
   final ValueNotifier<bool> confirmPasswordNotifier = ValueNotifier(true);
   final ValueNotifier<bool> fieldValidNotifier = ValueNotifier(false);
@@ -56,8 +58,8 @@ class _RegisterPageState extends State<RegisterPage> {
         confirmPassword.isEmpty) return;
 
     if (AppRegex.emailRegex.hasMatch(email) &&
-        AppRegex.passwordRegex.hasMatch(password) &&
-        AppRegex.passwordRegex.hasMatch(confirmPassword)) {
+        password.length >= 8 &&
+        confirmPassword.length >= 8) {
       fieldValidNotifier.value = true;
     } else {
       fieldValidNotifier.value = false;
@@ -216,11 +218,32 @@ class _RegisterPageState extends State<RegisterPage> {
                       );
                     },
                   ),
-                  TextButton(
-                      onPressed: () async {
-                        await register(context);
-                      },
-                      child: const Text('注册'),),
+
+                  // TextButton(
+                  //   onPressed: () async {
+                  //     await register(context);
+                  //   },
+                  //   child: const Text('注册'),
+                  // ),
+                  ValueListenableBuilder(
+                    valueListenable: fieldValidNotifier,
+                    builder: (_, isValid, __) {
+                      return FilledButton(
+                        onPressed: isValid
+                            ? () async {
+                                if (isClicked == false) {
+                                  await register(context);
+                                } else {
+                                  await submitRegData(dataSend, context);
+                                }
+                              }
+                            : null,
+                        child: isClicked
+                            ? const Text('我完成了验证')
+                            : const Text(AppStrings.register),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -246,31 +269,83 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> register(BuildContext context) async {
-    SnackbarHelper.showSnackBar(
-      AppStrings.registrationComplete,
-    );
-    final api = API();
-    final data = await api.registerUserService(
+    try {
+      SnackbarHelper.showSnackBar(
+        AppStrings.registrationComplete,
+      );
+      final api = API();
+      final data = await api.registerUserService(
         username: nameController.text,
         password: passwordController.text,
-        email: emailController.text,);
+        email: emailController.text,
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('一封确认邮件已经发往你的邮箱，请查收后继续'),
-        backgroundColor: Colors.green,
-      ),
-    );
+      dataSend = data;
 
-    await Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => RegEmailAuthWidget(
-              sid: data,
-              username: nameController.text.trim(),
-              password: passwordController.text.trim(),
-            ),),);
-    nameController.clear();
-    emailController.clear();
-    passwordController.clear();
-    confirmPasswordController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('一封确认邮件已经发往你的邮箱，请查收后继续，请在完成验证后点击我完成了验证'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      setState(() {
+        isClicked = true;
+      });
+      // await submitRegData(dataSend, context);
+      // nameController.clear();
+      // emailController.clear();
+      // passwordController.clear();
+      // confirmPasswordController.clear();
+    } catch (e) {
+      
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> submitRegData(String dataSend, BuildContext context) async {
+    final dataAuth = {
+      'auth': {
+        'type': 'm.login.email.identity',
+        'threepid_creds': {
+          'sid': dataSend,
+          'client_secret': 'onZR8j57RKTTU8wM',
+          'id_server': 'matrix.phosphorus.top',
+        },
+      },
+      'device_id': 'unknown',
+      'initial_device_display_name': 'unknown',
+      'password': passwordController.text,
+      'username': nameController.text,
+    };
+
+    final dio = Dio();
+    try {
+      final resp = await dio.post(
+        HttpHandlerIm.host + HttpHandlerIm.reg,
+        data: dataAuth,
+      );
+      if (resp.statusCode != 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(resp.data.toString()),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('注册成功！现在你可以关闭页面了'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
